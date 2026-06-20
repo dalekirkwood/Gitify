@@ -2,10 +2,36 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnection } from "@/state/connection";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/input";
+import { MentionsInput, Mention } from "react-mentions";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Issue } from "@/lib/forge";
+
+// Dark-theme styling for react-mentions (it uses an inline style object).
+const mentionStyle = {
+  control: { fontSize: 14, minHeight: 76 },
+  highlighter: { padding: "8px 12px" },
+  input: {
+    padding: "8px 12px",
+    border: "1px solid hsl(var(--input))",
+    borderRadius: 6,
+    color: "hsl(var(--foreground))",
+    outline: "none",
+  },
+  suggestions: {
+    list: {
+      background: "hsl(var(--card))",
+      border: "1px solid hsl(var(--border))",
+      borderRadius: 6,
+      fontSize: 14,
+      overflow: "hidden",
+    },
+    item: {
+      padding: "6px 10px",
+      "&focused": { background: "hsl(var(--muted))" },
+    },
+  },
+} as const;
 
 export function IssueDetail({
   owner,
@@ -66,6 +92,7 @@ export function IssueDetail({
 
   const cur = detail.data!;
   const currentLogins = new Set((cur.assignees ?? []).map((a) => a.login));
+  const mentionData = (assignees.data ?? []).map((u) => ({ id: u.login, display: u.login }));
 
   return (
     <div className="flex h-full">
@@ -97,12 +124,21 @@ export function IssueDetail({
           ))}
         </div>
         <div className="mt-4 space-y-2">
-          <Textarea
-            rows={3}
-            placeholder="Add a note…"
+          <MentionsInput
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
-          />
+            onChange={(_, newValue) => setComment(newValue)}
+            placeholder="Add a note… use @ to mention"
+            style={mentionStyle}
+            allowSuggestionsAboveCursor
+          >
+            <Mention
+              trigger="@"
+              markup="@__display__"
+              displayTransform={(_, display) => `@${display}`}
+              data={mentionData}
+              appendSpaceOnAdd
+            />
+          </MentionsInput>
           {addComment.error && (
             <p className="text-sm text-red-400">Failed — your text is kept, try again.</p>
           )}
