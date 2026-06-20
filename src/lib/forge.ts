@@ -172,6 +172,11 @@ export class ForgeClient {
 
   listLabels = (owner: string, repo: string) =>
     this.req<Label[]>(`/repos/${owner}/${repo}/labels`);
+  createLabel = (owner: string, repo: string, body: { name: string; color: string }) =>
+    this.req<Label>(`/repos/${owner}/${repo}/labels`, "POST", body);
+  // Replace the full label set on an issue (used to move a card between status columns).
+  setIssueLabels = (owner: string, repo: string, n: number, labels: number[]) =>
+    this.req<Label[]>(`/repos/${owner}/${repo}/issues/${n}/labels`, "PUT", { labels });
   listMilestones = (owner: string, repo: string) =>
     this.req<Milestone[]>(`/repos/${owner}/${repo}/milestones`);
   listAssignees = (owner: string, repo: string) =>
