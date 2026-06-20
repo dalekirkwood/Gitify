@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Plus } from "lucide-react";
+import { NewIssueDialog } from "@/screens/NewIssueDialog";
 import type { Issue } from "@/lib/forge";
 import { viewLabel, type View } from "@/lib/view";
 
@@ -20,6 +22,7 @@ export function IssueList({
   const { client } = useConnection();
   const [state, setState] = useState<State>("open");
   const [q, setQ] = useState("");
+  const [showNew, setShowNew] = useState(false);
 
   const issues = useQuery({
     queryKey: ["issues", view, state, q],
@@ -58,6 +61,10 @@ export function IssueList({
             {s}
           </Button>
         ))}
+        <Button className="ml-auto" onClick={() => setShowNew(true)}>
+          <Plus className="size-4" />
+          New Issue
+        </Button>
       </div>
       <div className="flex-1 overflow-y-auto">
         {issues.isLoading && <p className="p-4 text-sm text-muted-foreground">Loading…</p>}
@@ -97,6 +104,13 @@ export function IssueList({
           </button>
         ))}
       </div>
+      {showNew && (
+        <NewIssueDialog
+          view={view}
+          onClose={() => setShowNew(false)}
+          onCreated={(owner, repo, issue) => onOpen(owner, repo, issue)}
+        />
+      )}
     </div>
   );
 }
