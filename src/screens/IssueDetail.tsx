@@ -5,58 +5,59 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { Issue, Repo } from "@/lib/forge";
+import type { Issue } from "@/lib/forge";
 
 export function IssueDetail({
+  owner,
   repo,
   issue,
   onBack,
 }: {
-  repo: Repo;
+  owner: string;
+  repo: string;
   issue: Issue;
   onBack: () => void;
 }) {
   const { client } = useConnection();
   const qc = useQueryClient();
-  const owner = repo.owner.login;
-  const key = ["issue", repo.full_name, issue.number];
+  const full = `${owner}/${repo}`;
+  const key = ["issue", full, issue.number];
 
   const detail = useQuery({
     queryKey: key,
-    queryFn: () => client!.getIssue(owner, repo.name, issue.number),
+    queryFn: () => client!.getIssue(owner, repo, issue.number),
     initialData: issue,
   });
   const comments = useQuery({
     queryKey: [...key, "comments"],
-    queryFn: () => client!.listComments(owner, repo.name, issue.number),
+    queryFn: () => client!.listComments(owner, repo, issue.number),
   });
   const assignees = useQuery({
-    queryKey: ["assignees", repo.full_name],
-    queryFn: () => client!.listAssignees(owner, repo.name),
+    queryKey: ["assignees", full],
+    queryFn: () => client!.listAssignees(owner, repo),
   });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: key });
-    qc.invalidateQueries({ queryKey: ["issues", repo.full_name] });
+    qc.invalidateQueries({ queryKey: ["issues"] });
   };
 
   const toggleState = useMutation({
     mutationFn: () =>
-      client!.patchIssue(owner, repo.name, issue.number, {
+      client!.patchIssue(owner, repo, issue.number, {
         state: detail.data!.state === "open" ? "closed" : "open",
       }),
     onSuccess: invalidate,
   });
 
   const setAssignee = useMutation({
-    mutationFn: (logins: string[]) =>
-      client!.patchIssue(owner, repo.name, issue.number, { assignees: logins }),
+    mutationFn: (logins: string[]) => client!.patchIssue(owner, repo, issue.number, { assignees: logins }),
     onSuccess: invalidate,
   });
 
   const [comment, setComment] = useState("");
   const addComment = useMutation({
-    mutationFn: (body: string) => client!.addComment(owner, repo.name, issue.number, body),
+    mutationFn: (body: string) => client!.addComment(owner, repo, issue.number, body),
     onSuccess: () => {
       setComment(""); // only cleared after a confirmed write — never drop unsent text
       qc.invalidateQueries({ queryKey: [...key, "comments"] });
@@ -72,6 +73,7 @@ export function IssueDetail({
         <Button variant="ghost" onClick={onBack} className="mb-4">
           ← Back
         </Button>
+        <div className="text-xs text-muted-foreground">{full}</div>
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">{cur.title}</h2>
           <span className="text-sm text-muted-foreground">#{cur.number}</span>

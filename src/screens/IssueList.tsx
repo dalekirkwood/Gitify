@@ -5,29 +5,48 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Issue, IssueFilters, Repo } from "@/lib/forge";
+import type { Issue } from "@/lib/forge";
+import { viewLabel, type View } from "@/lib/view";
+
+type State = "open" | "closed" | "all";
 
 export function IssueList({
-  repo,
+  view,
   onOpen,
 }: {
-  repo: Repo;
-  onOpen: (issue: Issue) => void;
+  view: View;
+  onOpen: (owner: string, repo: string, issue: Issue) => void;
 }) {
   const { client } = useConnection();
-  const [state, setState] = useState<IssueFilters["state"]>("open");
+  const [state, setState] = useState<State>("open");
   const [q, setQ] = useState("");
 
   const issues = useQuery({
-    queryKey: ["issues", repo.full_name, state, q],
-    queryFn: () =>
-      client!.listIssues(repo.owner.login, repo.name, { state, q: q || undefined }),
+    queryKey: ["issues", view, state, q],
     enabled: !!client,
+    queryFn: () => {
+      const query = q || undefined;
+      if (view.kind === "repo") {
+        return client!.listIssues(view.repo.owner.login, view.repo.name, { state, q: query });
+      }
+      return client!.searchIssues({ ...view.params, state, q: query });
+    },
   });
+
+  const crossRepo = view.kind === "search";
+
+  function open(i: Issue) {
+    if (view.kind === "repo") {
+      onOpen(view.repo.owner.login, view.repo.name, i);
+    } else if (i.repository) {
+      onOpen(i.repository.owner, i.repository.name, i);
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-border p-3">
+        <h2 className="mr-2 font-semibold">{viewLabel(view)}</h2>
         <Input
           placeholder="Search issues…"
           value={q}
@@ -35,24 +54,19 @@ export function IssueList({
           className="max-w-xs"
         />
         {(["open", "closed", "all"] as const).map((s) => (
-          <Button
-            key={s}
-            variant={state === s ? "default" : "outline"}
-            onClick={() => setState(s)}
-          >
+          <Button key={s} variant={state === s ? "default" : "outline"} onClick={() => setState(s)}>
             {s}
           </Button>
         ))}
       </div>
       <div className="flex-1 overflow-y-auto">
         {issues.isLoading && <p className="p-4 text-sm text-muted-foreground">Loading…</p>}
-        {issues.data?.length === 0 && (
-          <p className="p-4 text-sm text-muted-foreground">No issues.</p>
-        )}
+        {issues.error && <p className="p-4 text-sm text-red-400">Failed to load issues.</p>}
+        {issues.data?.length === 0 && <p className="p-4 text-sm text-muted-foreground">No issues.</p>}
         {issues.data?.map((i) => (
           <button
             key={i.id}
-            onClick={() => onOpen(i)}
+            onClick={() => open(i)}
             className="flex w-full flex-col gap-1 border-b border-border px-4 py-3 text-left hover:bg-muted"
           >
             <div className="flex items-center gap-2">
@@ -64,6 +78,9 @@ export function IssueList({
               />
               <span className="font-medium">{i.title}</span>
               <span className="text-xs text-muted-foreground">#{i.number}</span>
+              {crossRepo && i.repository && (
+                <span className="ml-auto text-xs text-muted-foreground">{i.repository.full_name}</span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-1 pl-4">
               {i.labels.map((l) => (

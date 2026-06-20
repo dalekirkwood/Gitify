@@ -38,6 +38,13 @@ export interface Milestone {
   title: string;
   state: string;
 }
+// /repos/issues/search returns a nested repository ref (owner is a login string)
+export interface RepoRef {
+  id: number;
+  name: string;
+  owner: string;
+  full_name: string;
+}
 export interface Issue {
   id: number;
   number: number;
@@ -50,12 +57,17 @@ export interface Issue {
   milestone: Milestone | null;
   comments: number;
   updated_at: string;
+  repository?: RepoRef;
 }
 export interface Comment {
   id: number;
   body: string;
   user: ForgeUser;
   created_at: string;
+}
+export interface Org {
+  id: number;
+  username: string;
 }
 
 export interface IssueFilters {
@@ -73,6 +85,31 @@ export function buildIssueQuery(f: IssueFilters): string {
   if (f.labels) p.set("labels", f.labels);
   if (f.milestones) p.set("milestones", f.milestones);
   if (f.q) p.set("q", f.q);
+  p.set("page", String(f.page ?? 1));
+  p.set("limit", "50");
+  return p.toString();
+}
+
+// Global cross-repo issue search (/repos/issues/search)
+export interface SearchFilters {
+  state?: "open" | "closed" | "all";
+  owner?: string; // restrict to an org/user
+  assigned?: boolean; // assigned to me
+  created?: boolean; // created by me
+  q?: string;
+  labels?: string;
+  page?: number;
+}
+
+export function buildSearchQuery(f: SearchFilters): string {
+  const p = new URLSearchParams();
+  p.set("type", "issues");
+  if (f.state) p.set("state", f.state);
+  if (f.owner) p.set("owner", f.owner);
+  if (f.assigned) p.set("assigned", "true");
+  if (f.created) p.set("created", "true");
+  if (f.q) p.set("q", f.q);
+  if (f.labels) p.set("labels", f.labels);
   p.set("page", String(f.page ?? 1));
   p.set("limit", "50");
   return p.toString();
@@ -108,6 +145,12 @@ export class ForgeClient {
 
   whoami = () => this.req<ForgeUser>("/user");
   listRepos = () => this.req<Repo[]>("/user/repos?limit=50");
+  listOrgs = () => this.req<Org[]>("/user/orgs?limit=50");
+  listOrgRepos = (org: string) => this.req<Repo[]>(`/orgs/${org}/repos?limit=50`);
+
+  // Cross-repo issue search powers the "All / Assigned / Created / by-org" views.
+  searchIssues = (f: SearchFilters = {}) =>
+    this.req<Issue[]>(`/repos/issues/search?${buildSearchQuery(f)}`);
 
   listIssues = (owner: string, repo: string, f: IssueFilters = {}) =>
     this.req<Issue[]>(`/repos/${owner}/${repo}/issues?${buildIssueQuery(f)}`);
