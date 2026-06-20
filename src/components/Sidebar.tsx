@@ -10,6 +10,7 @@ import {
   ListTodo,
   UserCheck,
   PenLine,
+  Activity as ActivityIcon,
   PanelLeftClose,
   Settings as SettingsIcon,
   LogOut,
@@ -17,7 +18,7 @@ import {
 import type { View } from "@/lib/view";
 
 function keyOf(v: View): string {
-  return v.kind === "search" ? `search:${v.label}` : `repo:${v.repo.full_name}`;
+  return v.kind === "repo" ? `repo:${v.repo.full_name}` : `${v.kind}:${v.label}`;
 }
 
 function Collapsible({
@@ -152,6 +153,7 @@ export function Sidebar({
     { label: "All Issues", icon: <ListTodo className="size-4" />, v: { kind: "search", label: "All Issues", params: { state: "open" } } },
     { label: "Assigned to me", icon: <UserCheck className="size-4" />, v: { kind: "search", label: "Assigned to me", params: { state: "open", assigned: true } } },
     { label: "Created by me", icon: <PenLine className="size-4" />, v: { kind: "search", label: "Created by me", params: { state: "open", created: true } } },
+    { label: "Activity", icon: <ActivityIcon className="size-4" />, v: { kind: "activity", label: "Activity" } },
   ];
 
   return (
@@ -161,8 +163,11 @@ export function Sidebar({
         className,
       )}
     >
-      <div className="flex items-center justify-between p-4">
-        <span className="text-base font-semibold">Gitify</span>
+      <div className="flex items-center justify-between px-4 pb-4 pt-[max(env(safe-area-inset-top),1.75rem)] md:pt-4">
+        <span className="flex items-center gap-2 text-base font-semibold">
+          <img src="/icon.svg" alt="" className="size-5" />
+          Gitify
+        </span>
         <Button variant="ghost" onClick={onClose} title="Collapse" className="px-2">
           <PanelLeftClose className="size-4" />
         </Button>

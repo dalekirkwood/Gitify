@@ -94,9 +94,45 @@ export function IssueDetail({
   const currentLogins = new Set((cur.assignees ?? []).map((a) => a.login));
   const mentionData = (assignees.data ?? []).map((u) => ({ id: u.login, display: u.login }));
 
+  const metaPanel = (
+    <>
+      <div>
+        <div className="text-xs font-semibold text-muted-foreground">Status</div>
+        <Button variant="outline" className="mt-2 w-full" onClick={() => toggleState.mutate()}>
+          {cur.state === "open" ? "Close issue" : "Reopen issue"}
+        </Button>
+      </div>
+      <div>
+        <div className="text-xs font-semibold text-muted-foreground">Assignees</div>
+        <div className="mt-2 space-y-1">
+          {assignees.data?.map((u) => {
+            const on = currentLogins.has(u.login);
+            return (
+              <button
+                key={u.id}
+                onClick={() => {
+                  const next = new Set(currentLogins);
+                  on ? next.delete(u.login) : next.add(u.login);
+                  setAssignee.mutate([...next]);
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-muted",
+                  on && "bg-muted font-medium",
+                )}
+              >
+                <span className={cn("size-2 rounded-full", on ? "bg-primary" : "bg-border")} />
+                @{u.login}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex h-full">
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6">
         <Button variant="ghost" onClick={onBack} className="mb-4">
           ← Back
         </Button>
@@ -112,6 +148,12 @@ export function IssueDetail({
             </Badge>
           ))}
         </div>
+        <details className="mt-3 rounded-md border border-border md:hidden">
+          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold text-muted-foreground">
+            Status &amp; assignees
+          </summary>
+          <div className="space-y-4 border-t border-border p-3">{metaPanel}</div>
+        </details>
         <p className="mt-4 whitespace-pre-wrap text-sm">{cur.body || "No description."}</p>
 
         <h3 className="mt-8 text-sm font-semibold">Comments</h3>
@@ -151,38 +193,8 @@ export function IssueDetail({
         </div>
       </div>
 
-      <aside className="w-60 shrink-0 space-y-6 border-l border-border p-4">
-        <div>
-          <div className="text-xs font-semibold text-muted-foreground">Status</div>
-          <Button variant="outline" className="mt-2 w-full" onClick={() => toggleState.mutate()}>
-            {cur.state === "open" ? "Close issue" : "Reopen issue"}
-          </Button>
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-muted-foreground">Assignees</div>
-          <div className="mt-2 space-y-1">
-            {assignees.data?.map((u) => {
-              const on = currentLogins.has(u.login);
-              return (
-                <button
-                  key={u.id}
-                  onClick={() => {
-                    const next = new Set(currentLogins);
-                    on ? next.delete(u.login) : next.add(u.login);
-                    setAssignee.mutate([...next]);
-                  }}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-muted",
-                    on && "bg-muted font-medium",
-                  )}
-                >
-                  <span className={cn("size-2 rounded-full", on ? "bg-primary" : "bg-border")} />
-                  @{u.login}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <aside className="hidden w-60 shrink-0 space-y-6 border-l border-border p-4 md:block">
+        {metaPanel}
       </aside>
     </div>
   );

@@ -8,3 +8,9 @@ dist-ssr
 
 # Rust / Tauri
 src-tauri/target
+
+# Compiled TUI binary (built for releases)
+src-tauri/gitify-tui
+
+# Stray per-machine agent notes (belongs to another project)
+AGENTS.md

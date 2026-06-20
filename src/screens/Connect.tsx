@@ -26,8 +26,9 @@ export function Connect() {
   return (
     <div className="flex h-full items-center justify-center p-6">
       <form onSubmit={submit} className="w-full max-w-sm space-y-4">
-        <div>
-          <h1 className="text-xl font-semibold">Gitify</h1>
+        <div className="flex flex-col items-center text-center">
+          <img src="/icon.svg" alt="Gitify" className="size-16" />
+          <h1 className="mt-3 text-xl font-semibold">Gitify</h1>
           <p className="text-sm text-muted-foreground">Connect to your Forgejo or Gitea instance.</p>
         </div>
         <label className="block space-y-1">

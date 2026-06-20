@@ -7,9 +7,15 @@
 let fetchPromise: Promise<typeof fetch> | null = null;
 function getFetch(): Promise<typeof fetch> {
   if (!fetchPromise) {
-    fetchPromise = import("@tauri-apps/plugin-http")
-      .then((m) => m.fetch as unknown as typeof fetch)
-      .catch(() => fetch);
+    if (typeof window === "undefined") {
+      // Node (terminal app): no webview CORS, so the global fetch hits the
+      // instance directly — no Tauri plugin needed.
+      fetchPromise = Promise.resolve(fetch);
+    } else {
+      fetchPromise = import("@tauri-apps/plugin-http")
+        .then((m) => m.fetch as unknown as typeof fetch)
+        .catch(() => fetch);
+    }
   }
   return fetchPromise;
 }
@@ -68,6 +74,18 @@ export interface Comment {
 export interface Org {
   id: number;
   username: string;
+}
+
+// Activity feed event (/users|repos/.../activities/feeds). content for issue ops
+// is a JSON string ["<issueNumber>","<extra>"]; ref_name carries branch/tag ops.
+export interface Activity {
+  id: number;
+  op_type: string;
+  act_user: ForgeUser;
+  repo: { full_name: string };
+  created: string;
+  content: string;
+  ref_name: string;
 }
 
 export interface IssueFilters {
@@ -181,4 +199,10 @@ export class ForgeClient {
     this.req<Milestone[]>(`/repos/${owner}/${repo}/milestones`);
   listAssignees = (owner: string, repo: string) =>
     this.req<ForgeUser[]>(`/repos/${owner}/${repo}/assignees`);
+
+  // Recent activity timelines: a user's actions, or everyone's in one repo.
+  userActivity = (login: string, limit = 10) =>
+    this.req<Activity[]>(`/users/${login}/activities/feeds?limit=${limit}`);
+  repoActivity = (owner: string, repo: string, limit = 10) =>
+    this.req<Activity[]>(`/repos/${owner}/${repo}/activities/feeds?limit=${limit}`);
 }

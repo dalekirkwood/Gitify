@@ -32,7 +32,10 @@ export function IssueList({
       if (view.kind === "repo") {
         return client!.listIssues(view.repo.owner.login, view.repo.name, { state, q: query });
       }
-      return client!.searchIssues({ ...view.params, state, q: query });
+      if (view.kind === "search") {
+        return client!.searchIssues({ ...view.params, state, q: query });
+      }
+      return Promise.resolve([] as Issue[]);
     },
   });
 
@@ -48,23 +51,25 @@ export function IssueList({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-border p-3">
-        <h2 className="mr-2 font-semibold">{viewLabel(view)}</h2>
+      <div className="flex flex-col gap-2 border-b border-border p-3 md:flex-row md:items-center">
+        <h2 className="font-semibold md:mr-2">{viewLabel(view)}</h2>
         <Input
           placeholder="Search issues…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          className="max-w-xs"
+          className="w-full md:max-w-xs"
         />
-        {(["open", "closed", "all"] as const).map((s) => (
-          <Button key={s} variant={state === s ? "default" : "outline"} onClick={() => setState(s)}>
-            {s}
+        <div className="flex flex-wrap items-center gap-2 md:contents">
+          {(["open", "closed", "all"] as const).map((s) => (
+            <Button key={s} variant={state === s ? "default" : "outline"} onClick={() => setState(s)}>
+              {s}
+            </Button>
+          ))}
+          <Button className="ml-auto" onClick={() => setShowNew(true)}>
+            <Plus className="size-4" />
+            New Issue
           </Button>
-        ))}
-        <Button className="ml-auto" onClick={() => setShowNew(true)}>
-          <Plus className="size-4" />
-          New Issue
-        </Button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto">
         {issues.isLoading && <p className="p-4 text-sm text-muted-foreground">Loading…</p>}

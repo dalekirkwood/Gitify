@@ -7,17 +7,18 @@
 }
 
 .dark {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  --card: 222 47% 14%;
-  --card-foreground: 210 40% 98%;
-  --muted: 217 33% 20%;
-  --muted-foreground: 215 20% 65%;
-  --primary: 217 91% 60%;
-  --primary-foreground: 210 40% 98%;
-  --border: 217 33% 24%;
-  --input: 217 33% 24%;
-  --ring: 217 91% 60%;
+  /* Catppuccin Macchiato */
+  --background: 232 23% 18%; /* Base      #24273a */
+  --foreground: 227 68% 88%; /* Text      #cad3f5 */
+  --card: 230 19% 26%; /* Surface0  #363a4f */
+  --card-foreground: 227 68% 88%; /* Text */
+  --muted: 231 16% 34%; /* Surface1  #494d64 */
+  --muted-foreground: 227 27% 72%; /* Subtext0  #a5adcb */
+  --primary: 220 83% 75%; /* Blue      #8aadf4 */
+  --primary-foreground: 236 23% 12%; /* Crust     #181926 */
+  --border: 231 16% 34%; /* Surface1  #494d64 */
+  --input: 231 16% 34%; /* Surface1 */
+  --ring: 220 83% 75%; /* Blue */
 }
 
 html,
@@ -34,4 +35,13 @@ body {
   /* ponytail: mobile safe areas for notches/home bars on iOS */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
+}
+
+/* ponytail: Android WebView reports safe-area-inset-top only for display cutouts,
+   not the status bar, so on phones force a minimum top gap. Upgrade path: a native
+   inset plugin if a device needs an exact value. */
+@media (max-width: 767px) {
+  body {
+    padding-top: max(env(safe-area-inset-top), 1.75rem);
+  }
 }
