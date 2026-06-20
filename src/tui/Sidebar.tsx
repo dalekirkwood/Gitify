@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput, measureElement, type DOMElement } from "ink";
+import TextInput from "ink-text-input";
 import Spinner from "ink-spinner";
 import type { ForgeClient, ForgeUser } from "../lib/forge";
 import type { View } from "../lib/view";
@@ -7,10 +8,12 @@ import { useAsync } from "./useAsync";
 import { useTerminalSize } from "./useTerminalSize";
 import { ScrollList, rangeLabel } from "./ScrollList";
 
-interface Item {
-  section: string;
-  label: string;
-  view: View;
+type Entry =
+  | { kind: "header"; label: string }
+  | { kind: "item"; label: string; section: string; view: View };
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(n, hi));
 }
 
 export function Sidebar({
@@ -28,37 +31,85 @@ export function Sidebar({
   const repos = useAsync(() => client.listRepos(), []);
   const orgs = useAsync(() => client.listOrgs(), []);
   const [cursor, setCursor] = useState(0);
+  const [mode, setMode] = useState<"browse" | "filter">("browse");
+  const [filter, setFilter] = useState("");
 
-  const smart: Item[] = [
-    { section: "Smart views", label: "All Issues", view: { kind: "search", label: "All Issues", params: { state: "open" } } },
-    { section: "Smart views", label: "Assigned to me", view: { kind: "search", label: "Assigned to me", params: { state: "open", assigned: true } } },
-    { section: "Smart views", label: "Created by me", view: { kind: "search", label: "Created by me", params: { state: "open", created: true } } },
+  const smart: { label: string; view: View }[] = [
+    { label: "All Issues", view: { kind: "search", label: "All Issues", params: { state: "open" } } },
+    { label: "Assigned to me", view: { kind: "search", label: "Assigned to me", params: { state: "open", assigned: true } } },
+    { label: "Created by me", view: { kind: "search", label: "Created by me", params: { state: "open", created: true } } },
   ];
-  const orgItems: Item[] = (orgs.data ?? []).map((o) => ({
-    section: "Organizations",
+  const orgViews: { label: string; view: View }[] = (orgs.data ?? []).map((o) => ({
     label: o.username,
     view: { kind: "search", label: o.username, params: { owner: o.username, state: "open" } },
   }));
-  const repoItems: Item[] = (repos.data ?? []).map((r) => ({
-    section: "Projects",
+  const repoViews: { label: string; view: View }[] = (repos.data ?? []).map((r) => ({
     label: r.full_name,
     view: { kind: "repo", repo: r },
   }));
-  const items = [...smart, ...orgItems, ...repoItems];
 
-  useInput((input, key) => {
-    if (input === "q") return onQuit();
-    if (key.downArrow || input === "j") setCursor((c) => Math.min(c + 1, items.length - 1));
-    if (key.upArrow || input === "k") setCursor((c) => Math.max(c - 1, 0));
-    if (key.pageDown || input === "f") setCursor((c) => Math.min(c + 10, items.length - 1));
-    if (key.pageUp || input === "b") setCursor((c) => Math.max(c - 10, 0));
-    if (input === "g") setCursor(0);
-    if (input === "G") setCursor(items.length - 1);
-    if (key.return && items[cursor]) onSelect(items[cursor].view);
-  });
+  const f = filter.trim().toLowerCase();
+  const match = (label: string) => !f || label.toLowerCase().includes(f);
 
-  const sel = Math.min(cursor, Math.max(items.length - 1, 0));
-  const section = items[sel]?.section ?? "";
+  const entries: Entry[] = [];
+  const pushSection = (section: string, rows_: { label: string; view: View }[]) => {
+    const kept = rows_.filter((r) => match(r.label));
+    if (kept.length === 0) return;
+    entries.push({ kind: "header", label: section });
+    for (const r of kept) entries.push({ kind: "item", label: r.label, section, view: r.view });
+  };
+  pushSection("Smart views", smart);
+  pushSection("Organizations", orgViews);
+  pushSection("Projects", repoViews);
+
+  const selectable = entries.reduce<number[]>((acc, e, i) => {
+    if (e.kind === "item") acc.push(i);
+    return acc;
+  }, []);
+
+  // Keep cursor on a real (selectable) row as the list/filter changes.
+  useEffect(() => {
+    if (selectable.length === 0) return;
+    if (!selectable.includes(cursor)) setCursor(selectable[0]);
+  }, [entries.length, filter]);
+
+  function step(delta: number) {
+    setCursor((cur) => {
+      if (selectable.length === 0) return cur;
+      const pos = selectable.indexOf(cur);
+      const np = clamp((pos < 0 ? 0 : pos) + delta, 0, selectable.length - 1);
+      return selectable[np];
+    });
+  }
+
+  useInput(
+    (input, key) => {
+      if (input === "q") return onQuit();
+      if (input === "/") { setMode("filter"); return; }
+      if (key.downArrow || input === "j") return step(1);
+      if (key.upArrow || input === "k") return step(-1);
+      if (key.pageDown || input === "f") return step(10);
+      if (key.pageUp || input === "b") return step(-10);
+      if (input === "g") return setCursor(selectable[0] ?? 0);
+      if (input === "G") return setCursor(selectable[selectable.length - 1] ?? 0);
+      if (key.return) {
+        const e = entries[cursor];
+        if (e && e.kind === "item") onSelect(e.view);
+      }
+    },
+    { isActive: mode === "browse" },
+  );
+
+  useInput(
+    (_input, key) => {
+      if (key.escape) { setFilter(""); setMode("browse"); }
+    },
+    { isActive: mode === "filter" },
+  );
+
+  const sel = selectable.includes(cursor) ? cursor : (selectable[0] ?? 0);
+  const pos = selectable.indexOf(sel);
+  const section = entries[sel]?.kind === "item" ? (entries[sel] as Entry & { section: string }).section : "";
   const loading = repos.loading || orgs.loading;
 
   const bodyRef = useRef<DOMElement | null>(null);
@@ -77,30 +128,45 @@ export function Sidebar({
           Gitify · {user.login}
         </Text>
         <Text dimColor>
-          {section} · {rangeLabel(sel, items.length)}
+          {section ? `${section} · ` : ""}{rangeLabel(pos, selectable.length)}
         </Text>
       </Box>
+
+      {mode === "filter" && (
+        <Box paddingX={1}>
+          <Text>Filter: </Text>
+          <TextInput value={filter} onChange={setFilter} onSubmit={() => setMode("browse")} />
+        </Box>
+      )}
 
       <Box ref={bodyRef} flexGrow={1} flexDirection="column" paddingX={1}>
         {loading ? (
           <Text>
             <Spinner type="dots" /> loading…
           </Text>
+        ) : selectable.length === 0 ? (
+          <Text dimColor>{f ? "No matches." : "Nothing here."}</Text>
         ) : (
           <ScrollList
-            items={items}
+            items={entries}
             selected={sel}
             height={bodyH}
-            renderRow={(it, isSel) => (
-              <Text
-                wrap="truncate"
-                color={isSel ? "black" : undefined}
-                backgroundColor={isSel ? "cyan" : undefined}
-              >
-                {isSel ? "▶ " : "  "}
-                {it.label}
-              </Text>
-            )}
+            renderRow={(e, isSel) =>
+              e.kind === "header" ? (
+                <Text bold dimColor>
+                  {`── ${e.label} ${"─".repeat(Math.max(0, columns - e.label.length - 7))}`}
+                </Text>
+              ) : (
+                <Text
+                  wrap="truncate"
+                  color={isSel ? "black" : undefined}
+                  backgroundColor={isSel ? "cyan" : undefined}
+                >
+                  {isSel ? "▶ " : "  "}
+                  {e.label}
+                </Text>
+              )
+            }
           />
         )}
         {repos.error ? <Text color="red">{repos.error}</Text> : null}
@@ -108,7 +174,9 @@ export function Sidebar({
 
       <Box paddingX={1}>
         <Text dimColor wrap="truncate">
-          ↑/↓ j/k move · g/G top/bottom · enter open · q quit
+          {mode === "filter"
+            ? "type to filter · enter apply · esc clear"
+            : "↑/↓ j/k move · g/G top/bottom · / filter · enter open · q quit"}
         </Text>
       </Box>
     </Box>
